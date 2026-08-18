@@ -190,8 +190,8 @@
                     <div class="icon"><i class="bi bi-file-earmark-excel"></i></div>
                     <h5 class="fw-semibold mb-2">גרור קובץ Excel לכאן או לחץ לבחירה</h5>
                     <p class="text-muted mb-3" style="font-size:0.9rem;">
-                        תומך בפורמט הייצוא של חברות האשראי<br>
-                        (גיליונות: עסקאות במועד החיוב / עסקאות חו״ל ומט״ח)
+                        תומך בפורמטי ייצוא של חברות האשראי<br>
+                        (למשל: עסקאות במועד החיוב, כאל / Max, מזרחי-טפחות ועוד)
                     </p>
                     <button class="btn btn-upload" type="button">
                         <i class="bi bi-upload me-1"></i>בחר קובץ Excel
@@ -454,64 +454,170 @@ function fmtSigned(n) {
 }
 
 /* ========== Excel Parsing ========== */
+
+/** Normalize header cell text (handles newlines / extra spaces) */
+function normalizeHeader(cell) {
+    return String(cell || '').replace(/\s+/g, ' ').trim();
+}
+
+/** Detect format from header row. Returns 'legacy' | 'cal' | null */
+function detectFormat(headerRow) {
+    if (!headerRow || !headerRow.length) return null;
+    const h0 = normalizeHeader(headerRow[0]);
+    const h1 = normalizeHeader(headerRow[1]);
+    const h2 = normalizeHeader(headerRow[2]);
+    const h5 = normalizeHeader(headerRow[5]);
+
+    // CAL / Max / Mizrahi-Tefahot style:
+    // תאריך עסקה | שם בית עסק | סכום עסקה | סכום חיוב | סוג עסקה | ענף | הערות
+    if (
+        (h0.includes('תאריך') && h0.includes('עסקה')) &&
+        (h1.includes('בית עסק') || h1.includes('שם בית')) &&
+        (h2.includes('סכום') || h5.includes('ענף'))
+    ) {
+        // Distinguish: legacy has category in col 2 and amount in col 5;
+        // CAL has amount in col 2/3 and category (ענף) in col 5.
+        if (h2.includes('סכום') || h5 === 'ענף' || h5.includes('ענף')) {
+            return 'cal';
+        }
+    }
+
+    // Legacy format (original): תאריך עסקה | בית עסק | קטגוריה | כרטיס | סוג | סכום | ...
+    if (h0.includes('תאריך') && (h0.includes('עסקה') || h0 === 'תאריך עסקה')) {
+        return 'legacy';
+    }
+    return null;
+}
+
+/** Parse various date representations into DD-MM-YYYY string + YYYY-MM month */
+function parseDateValue(val) {
+    let dateStr = '';
+    let month = '';
+    if (val == null || val === '') return { dateStr, month };
+
+    // Excel serial number (when cellDates:false and raw)
+    if (typeof val === 'number' && val > 20000 && val < 60000) {
+        // Excel epoch: days since 1899-12-30
+        const utc = new Date(Date.UTC(1899, 11, 30) + val * 86400000);
+        const d = utc.getUTCDate();
+        const m = utc.getUTCMonth() + 1;
+        const y = utc.getUTCFullYear();
+        dateStr = String(d).padStart(2, '0') + '-' + String(m).padStart(2, '0') + '-' + y;
+        month = y + '-' + String(m).padStart(2, '0');
+        return { dateStr, month };
+    }
+
+    // Already a Date object (if cellDates:true)
+    if (val instanceof Date && !isNaN(val.getTime())) {
+        const d = val.getDate();
+        const m = val.getMonth() + 1;
+        const y = val.getFullYear();
+        dateStr = String(d).padStart(2, '0') + '-' + String(m).padStart(2, '0') + '-' + y;
+        month = y + '-' + String(m).padStart(2, '0');
+        return { dateStr, month };
+    }
+
+    const s = String(val).trim();
+    // ISO-like: 2026-08-07 or 2026-08-07T00:00:00
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) {
+        dateStr = m[3].padStart(2, '0') + '-' + m[2].padStart(2, '0') + '-' + m[1];
+        month = m[1] + '-' + m[2].padStart(2, '0');
+        return { dateStr, month };
+    }
+    // DD/MM/YYYY or DD-MM-YYYY
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);
+    if (m) {
+        let y = m[3];
+        if (y.length === 2) y = '20' + y;
+        dateStr = m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') + '-' + y;
+        month = y + '-' + m[2].padStart(2, '0');
+        return { dateStr, month };
+    }
+    // Fallback: keep as-is
+    dateStr = s;
+    return { dateStr, month };
+}
+
+function parseAmount(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const n = parseFloat(String(val).replace(/,/g, '').replace(/[^\d.\-]/g, ''));
+    return isNaN(n) ? 0 : n;
+}
+
 function parseExcel(arrayBuffer) {
-    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
+    // Try with cellDates first for better date handling; fallback still works with serials
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellNF: false, cellText: false });
     const allData = [];
 
     workbook.SheetNames.forEach(sheetName => {
         const sheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+        // raw:true keeps numbers/Dates; we handle both
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
 
         let headerRowIdx = -1;
-        for (let i = 0; i < Math.min(rows.length, 15); i++) {
-            const cell = String(rows[i][0] || '').trim();
-            if (cell === 'תאריך עסקה' || cell.includes('תאריך עסקה')) {
+        let format = null;
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+            const cell0 = normalizeHeader(rows[i] && rows[i][0]);
+            if (cell0.includes('תאריך') && (cell0.includes('עסקה') || cell0 === 'תאריך עסקה')) {
                 headerRowIdx = i;
+                format = detectFormat(rows[i]);
                 break;
             }
         }
-        if (headerRowIdx < 0) return;
+        if (headerRowIdx < 0 || !format) return;
 
         for (let i = headerRowIdx + 1; i < rows.length; i++) {
             const row = rows[i];
-            if (!row || !row[0]) continue;
+            if (!row || row[0] == null || row[0] === '') continue;
 
-            const dateStr = String(row[0]).trim();
-            // Skip summary / total rows
-            if (dateStr === 'סך הכל' || dateStr.includes('₪') || !dateStr.match(/^\d{1,2}[-\/.]\d{1,2}[-\/.]\d{2,4}/)) {
+            const rawDate = row[0];
+            const dateCheck = String(rawDate).trim();
+            // Skip summary / footer rows
+            if (
+                dateCheck === 'סך הכל' ||
+                dateCheck.includes('₪') ||
+                dateCheck.includes('את המידע המלא') ||
+                dateCheck.includes('מידע על חיובים')
+            ) {
                 continue;
             }
 
-            const business = String(row[1] || '').trim();
-            const category = String(row[2] || '').trim();
-            const card = String(row[3] || '').trim();
-            const txType = String(row[4] || '').trim();
+            const { dateStr, month } = parseDateValue(rawDate);
+            // Require a plausible date
+            if (!dateStr || (!month && !dateStr.match(/\d/))) continue;
 
-            let amount = 0;
-            if (row[5] !== null && row[5] !== undefined && row[5] !== '') {
-                amount = parseFloat(String(row[5]).replace(/,/g, '').replace(/[^\d.\-]/g, ''));
-                if (isNaN(amount)) amount = 0;
+            let business, category, card, txType, amount, currency, chargeDate, notes, method;
+
+            if (format === 'cal') {
+                // CAL / Max: 0=date, 1=business, 2=amount, 3=chargeAmt, 4=type, 5=category(ענף), 6=notes
+                business = String(row[1] || '').trim();
+                amount = parseAmount(row[3] != null && row[3] !== '' ? row[3] : row[2]); // prefer סכום חיוב
+                txType = String(row[4] || '').trim();
+                category = String(row[5] || '').trim();
+                notes = String(row[6] || '').trim();
+                card = '';
+                currency = '₪';
+                chargeDate = '';
+                method = '';
+            } else {
+                // Legacy original format
+                business = String(row[1] || '').trim();
+                category = String(row[2] || '').trim();
+                card = String(row[3] || '').trim();
+                txType = String(row[4] || '').trim();
+                amount = parseAmount(row[5]);
+                currency = String(row[6] || '₪').trim();
+                chargeDate = String(row[9] || '').trim();
+                notes = String(row[10] || '').trim();
+                method = String(row[14] || '').trim();
             }
 
-            const currency = String(row[6] || '₪').trim();
-            const chargeDate = String(row[9] || '').trim();
-            const notes = String(row[10] || '').trim();
-            const method = String(row[14] || '').trim();
+            const isRecurring =
+                (notes && notes.includes('הוראת קבע')) ||
+                (txType && (txType.includes('הוראת קבע') || txType === 'הוראת קבע'));
 
-            // Parse month YYYY-MM from DD-MM-YYYY or similar
-            let month = '';
-            try {
-                const parts = dateStr.replace(/\//g, '-').split('-');
-                if (parts.length === 3) {
-                    let y = parts[2], m = parts[1], d = parts[0];
-                    if (y.length === 2) y = '20' + y;
-                    month = y + '-' + m.padStart(2, '0');
-                }
-            } catch (e) {}
-
-            const isRecurring = notes.includes('הוראת קבע') || txType.includes('הוראת קבע');
-
-            // Skip completely empty business+amount
             if (!business && amount === 0) continue;
 
             allData.push({
@@ -550,7 +656,7 @@ function handleFile(file) {
         try {
             const data = parseExcel(e.target.result);
             if (!data.length) {
-                alert('לא נמצאו עסקאות בקובץ.\nוודא שזה ייצוא בפורמט הסטנדרטי (עם עמודת "תאריך עסקה").');
+                alert('לא נמצאו עסקאות בקובץ.\nוודא שזה ייצוא בפורמט נתמך (עם עמודת "תאריך עסקה" – כאל/Max או פורמט ישן).');
                 document.getElementById('loadingOverlay').classList.remove('show');
                 return;
             }
