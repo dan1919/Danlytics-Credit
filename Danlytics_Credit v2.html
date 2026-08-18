@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דשבורד עסקאות אשראי</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #1a1a2e;
+            --text-muted: #6c757d;
+            --primary: #1e3c72;
+            --border: #e9ecef;
+            --shadow: 0 4px 16px rgba(0,0,0,0.06);
+        }
+        [data-theme="dark"] {
+            --bg: #0f1117;
+            --card-bg: #1a1d27;
+            --text: #e8eaed;
+            --text-muted: #9aa0a6;
+            --primary: #6ea8fe;
+            --border: #2d3140;
+            --shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Rubik', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 16px;
+            transition: background 0.3s, color 0.3s;
+            min-height: 100vh;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            transition: background 0.3s, border 0.3s;
+        }
+        .stat-card {
+            border-radius: 14px;
+            padding: 18px 20px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card .stat-value { font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
+        .stat-card .stat-label { font-size: 0.82rem; opacity: 0.9; margin-bottom: 4px; }
+        .stat-card .stat-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 2.2rem; opacity: 0.25; }
+        .kpi-blue { background: linear-gradient(135deg, #1e3c72, #2a5298); }
+        .kpi-green { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+        .kpi-orange { background: linear-gradient(135deg, #ea580c, #f59e0b); }
+        .kpi-purple { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+        .kpi-red { background: linear-gradient(135deg, #dc2626, #f87171); }
+        .kpi-teal { background: linear-gradient(135deg, #0f766e, #2dd4bf); }
+        .table-responsive { max-height: 520px; overflow-y: auto; }
+        .table { color: var(--text); margin-bottom: 0; }
+        .table th {
+            position: sticky; top: 0; z-index: 2;
+            background: var(--card-bg); color: var(--text-muted);
+            font-weight: 600; font-size: 0.8rem; white-space: nowrap;
+            border-bottom: 2px solid var(--border); cursor: pointer; user-select: none;
+        }
+        .table th:hover { color: var(--primary); }
+        .table td { font-size: 0.88rem; vertical-align: middle; border-color: var(--border); }
+        .table-hover tbody tr:hover { background: rgba(30,60,114,0.06); }
+        [data-theme="dark"] .table-hover tbody tr:hover { background: rgba(110,168,254,0.08); }
+        .badge-cat {
+            background: rgba(30,60,114,0.1); color: var(--primary);
+            font-weight: 500; font-size: 0.75rem; padding: 4px 8px; border-radius: 6px;
+        }
+        [data-theme="dark"] .badge-cat { background: rgba(110,168,254,0.15); color: #93c5fd; }
+        .badge-recurring { background: #fef3c7; color: #92400e; font-size: 0.7rem; }
+        [data-theme="dark"] .badge-recurring { background: #78350f; color: #fde68a; }
+        .amount-pos { color: #16a34a; font-weight: 600; }
+        .amount-neg { color: #dc2626; font-weight: 600; }
+        .filter-label { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
+        .form-control, .form-select {
+            background: var(--bg); border-color: var(--border); color: var(--text);
+            border-radius: 8px; font-size: 0.9rem;
+        }
+        .form-control:focus, .form-select:focus {
+            background: var(--bg); border-color: var(--primary); color: var(--text);
+            box-shadow: 0 0 0 3px rgba(30,60,114,0.15);
+        }
+        .btn-theme {
+            background: var(--card-bg); border: 1px solid var(--border); color: var(--text);
+            border-radius: 10px; padding: 6px 14px;
+        }
+        .btn-theme:hover { background: var(--border); }
+        .btn-export {
+            background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 6px 14px;
+        }
+        .btn-export:hover { opacity: 0.9; color: #fff; }
+        .btn-upload {
+            background: linear-gradient(135deg, #0d9488, #14b8a6); color: #fff; border: none;
+            border-radius: 10px; padding: 8px 18px; font-weight: 600;
+        }
+        .btn-upload:hover { opacity: 0.92; color: #fff; }
+        .section-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 12px; }
+        .top-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem;
+        }
+        .top-list-item:last-child { border-bottom: none; }
+        .chart-container { position: relative; height: 280px; }
+        .nav-pills .nav-link {
+            color: var(--text-muted); border-radius: 8px; font-size: 0.85rem; padding: 6px 14px;
+        }
+        .nav-pills .nav-link.active { background: var(--primary); color: #fff; }
+        .summary-box {
+            background: var(--bg); border-radius: 10px; padding: 12px 16px; margin-bottom: 10px;
+        }
+        .summary-box .label { font-size: 0.78rem; color: var(--text-muted); }
+        .summary-box .value { font-size: 1.15rem; font-weight: 700; }
+        .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            background: var(--card-bg);
+            transition: border-color 0.2s, background 0.2s;
+            cursor: pointer;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(30,60,114,0.04);
+        }
+        [data-theme="dark"] .upload-zone:hover, [data-theme="dark"] .upload-zone.dragover {
+            background: rgba(110,168,254,0.08);
+        }
+        .upload-zone .icon { font-size: 3rem; color: var(--primary); margin-bottom: 12px; }
+        .file-name-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 4px 12px; font-size: 0.85rem;
+        }
+        #dashboardContent { display: none; }
+        #uploadSection { display: block; }
+        .loading-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            display: none; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .loading-overlay.show { display: flex; }
+        .spinner-box {
+            background: var(--card-bg); border-radius: 14px; padding: 28px 40px;
+            text-align: center; box-shadow: var(--shadow);
+        }
+        @media (max-width: 768px) {
+            .stat-card .stat-value { font-size: 1.35rem; }
+            .chart-container { height: 240px; }
+        }
+    </style>
+</head>
+<footer class="text-center text-muted py-3">
+    Developed by Dan Ogen
+</footer>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-box">
+        <div class="spinner-border text-primary mb-3" role="status"></div>
+        <div class="fw-semibold">טוען ומעבד את הקובץ...</div>
+    </div>
+</div>
+
+<div class="container-fluid px-2 px-md-3">
+
+    <!-- Upload Section -->
+    <div id="uploadSection">
+        <div class="text-center mb-4 mt-3">
+            <h2 class="fw-bold" style="color: var(--primary);">
+                <i class="bi bi-credit-card-2-front me-2"></i>דשבורד עסקאות אשראי
+            </h2>
+            <p class="text-muted">טען קובץ ייצוא מאפליקציית האשראי שלך</p>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-7 col-xl-6">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="icon"><i class="bi bi-file-earmark-excel"></i></div>
+                    <h5 class="fw-semibold mb-2">גרור קובץ Excel לכאן או לחץ לבחירה</h5>
+                    <p class="text-muted mb-3" style="font-size:0.9rem;">
+                        תומך בפורמטי ייצוא של חברות האשראי<br>
+                        (למשל: עסקאות במועד החיוב, כאל / Max, מזרחי-טפחות ועוד)
+                    </p>
+                    <button class="btn btn-upload" type="button">
+                        <i class="bi bi-upload me-1"></i>בחר קובץ Excel
+                    </button>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+                </div>
+                <div class="text-center mt-3">
+                    <button class="btn btn-theme btn-sm" id="themeToggleTop" onclick="toggleTheme()">
+                        <i class="bi bi-moon-stars"></i> מצב כהה
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div id="dashboardContent">
+        <!-- Header -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+            <div>
+                <h2 class="fw-bold mb-0" style="color: var(--primary);">
+                    <i class="bi bi-credit-card-2-front me-2"></i>דשבורד עסקאות אשראי
+                </h2>
+                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                    <span class="file-name-badge" id="loadedFileName">
+                        <i class="bi bi-file-earmark-excel text-success"></i>
+                        <span></span>
+                    </span>
+                    <span class="text-muted" style="font-size:0.85rem;" id="dataRange"></span>
+                </div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-upload btn-sm" onclick="document.getElementById('fileInput').click()">
+                    <i class="bi bi-arrow-repeat me-1"></i>טען קובץ אחר
+                </button>
+                <button class="btn btn-export" onclick="exportCSV()">
+                    <i class="bi bi-download me-1"></i>ייצוא CSV
+                </button>
+                <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()">
+                    <i class="bi bi-moon-stars"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="stat-card kpi-blue">
+                    <div class="stat-label">סה״כ הוצאות</div>
+                    <div class="stat-value" id="kpi-total">₪0</div>
+                    <i class="bi bi-cash-stack stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="stat-card kpi-green">
+                    <div class="stat-label">מספר עסקאות</div>
+                    <div class="stat-value" id="kpi-count">0</div>
+                    <i class="bi bi-receipt stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="stat-card kpi-orange">
+                    <div class="stat-label">ממוצע לעסקה</div>
+                    <div class="stat-value" id="kpi-avg">₪0</div>
+                    <i class="bi bi-graph-up stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="stat-card kpi-purple">
+                    <div class="stat-label">ממוצע חודשי</div>
+                    <div class="stat-value" id="kpi-monthly">₪0</div>
+                    <i class="bi bi-calendar3 stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="stat-card kpi-teal">
+                    <div class="stat-label">הוראות קבע</div>
+                    <div class="stat-value" id="kpi-recurring">₪0</div>
+                    <i class="bi bi-arrow-repeat stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="stat-card kpi-red">
+                    <div class="stat-label">קטגוריה מובילה</div>
+                    <div class="stat-value" id="kpi-topcat" style="font-size:1.1rem;">-</div>
+                    <i class="bi bi-trophy stat-icon"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card p-3 mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <div class="filter-label">חיפוש חופשי</div>
+                    <input type="text" id="searchInput" class="form-control" placeholder="בית עסק, הערות...">
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-label">קטגוריה</div>
+                    <select id="categoryFilter" class="form-select">
+                        <option value="">הכל</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-label">חודש</div>
+                    <select id="monthFilter" class="form-select">
+                        <option value="">כל החודשים</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-label">סוג</div>
+                    <select id="typeFilter" class="form-select">
+                        <option value="">הכל</option>
+                        <option value="recurring">הוראות קבע בלבד</option>
+                        <option value="regular">רגילות בלבד</option>
+                        <option value="transfers">העברות כספים</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-label">כרטיס</div>
+                    <select id="cardFilter" class="form-select">
+                        <option value="">הכל</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-outline-secondary w-100" onclick="resetFilters()" title="איפוס">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-5">
+                <div class="card p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="section-title mb-0" id="catChartTitle">התפלגות לפי קטגוריה</div>
+                        <ul class="nav nav-pills" id="catChartTabs">
+                            <li class="nav-item"><button class="nav-link active" data-type="doughnut" onclick="switchCatChart(this,'doughnut')">עוגה</button></li>
+                            <li class="nav-item"><button class="nav-link" data-type="bar" onclick="switchCatChart(this,'bar')">עמודות</button></li>
+                        </ul>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card p-3 h-100">
+                    <div class="section-title">הוצאות לפי חודש</div>
+                    <div class="chart-container">
+                        <canvas id="monthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <div class="card p-3 h-100">
+                    <div class="section-title">Top 8 בתי עסק</div>
+                    <div id="topMerchants"></div>
+                </div>
+            </div>
+        </div>
+
+       <!-- Fixed vs Variable + Insights -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4" style="display:none;">
+        <div class="card p-3">
+            <div class="section-title">קבוע מול משתנה</div>
+            <div class="summary-box">
+                <div class="label">הוצאות קבועות (הוראות קבע)</div>
+                <div class="value" id="fixed-amount">₪0</div>
+                <div class="progress mt-2" style="height:8px;">
+                    <div class="progress-bar" id="fixed-bar" style="width:0%;background:#0d9488!important;"></div>
+                </div>
+            </div>
+            <div class="summary-box">
+                <div class="label">הוצאות משתנות</div>
+                <div class="value" id="variable-amount">₪0</div>
+                <div class="progress mt-2" style="height:8px;">
+                    <div class="progress-bar" id="variable-bar" style="width:0%;background:#ea580c!important;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4" style="display:none;">
+        <div class="card p-3">
+            <div class="section-title">תובנות מהירות</div>
+            <div id="insights" style="font-size:0.88rem; line-height:1.7;"></div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card p-3">
+            <div class="section-title">סיכום העברות</div>
+            <div id="bitSummary" style="font-size:0.88rem;"></div>
+        </div>
+    </div>
+</div>
+
+        <!-- Transactions Table -->
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="section-title mb-0">פירוט עסקאות <span class="text-muted" style="font-weight:400;font-size:0.85rem;" id="tableCount"></span></div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover" id="txTable">
+                    <thead>
+                        <tr>
+                            <th data-sort="date">תאריך <i class="bi bi-arrow-down-up"></i></th>
+                            <th data-sort="business">בית עסק <i class="bi bi-arrow-down-up"></i></th>
+                            <th data-sort="category">קטגוריה</th>
+                            <th data-sort="amount">סכום <i class="bi bi-arrow-down-up"></i></th>
+                            <th>סוג</th>
+                            <th>הערות</th>
+                            <th>תאריך חיוב</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="empty-state d-none">
+                <i class="bi bi-inbox" style="font-size:2.5rem;"></i>
+                <p class="mt-2">לא נמצאו עסקאות התואמות את הסינון</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let rawData = [];
+let currentData = [];
+let catChart = null;
+let monthlyChart = null;
+let catChartType = 'doughnut';
+let sortCol = 'date';
+let sortAsc = false;
+
+const COLORS = [
+    '#1e3c72','#0d9488','#ea580c','#7c3aed','#dc2626',
+    '#2563eb','#ca8a04','#db2777','#0891b2','#4f46e5','#16a34a'
+];
+
+const MONTH_NAMES = {
+    '01':'ינואר','02':'פברואר','03':'מרץ','04':'אפריל','05':'מאי','06':'יוני',
+    '07':'יולי','08':'אוגוסט','09':'ספטמבר','10':'אוקטובר','11':'נובמבר','12':'דצמבר'
+};
+const MONTH_SHORT = {
+    '01':'ינו','02':'פבר','03':'מרץ','04':'אפר','05':'מאי','06':'יונ',
+    '07':'יול','08':'אוג','09':'ספט','10':'אוק','11':'נוב','12':'דצמ'
+};
+
+function fmt(n) {
+    return '₪' + Math.abs(n).toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function fmtSigned(n) {
+    const s = n < 0 ? '-' : '';
+    return s + '₪' + Math.abs(n).toLocaleString('he-IL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+/* ========== Excel Parsing ========== */
+
+/** Normalize header cell text (handles newlines / extra spaces) */
+function normalizeHeader(cell) {
+    return String(cell || '').replace(/\s+/g, ' ').trim();
+}
+
+/** Detect format from header row. Returns 'legacy' | 'cal' | null */
+function detectFormat(headerRow) {
+    if (!headerRow || !headerRow.length) return null;
+    const h0 = normalizeHeader(headerRow[0]);
+    const h1 = normalizeHeader(headerRow[1]);
+    const h2 = normalizeHeader(headerRow[2]);
+    const h5 = normalizeHeader(headerRow[5]);
+
+    // CAL / Max / Mizrahi-Tefahot style:
+    // תאריך עסקה | שם בית עסק | סכום עסקה | סכום חיוב | סוג עסקה | ענף | הערות
+    if (
+        (h0.includes('תאריך') && h0.includes('עסקה')) &&
+        (h1.includes('בית עסק') || h1.includes('שם בית')) &&
+        (h2.includes('סכום') || h5.includes('ענף'))
+    ) {
+        // Distinguish: legacy has category in col 2 and amount in col 5;
+        // CAL has amount in col 2/3 and category (ענף) in col 5.
+        if (h2.includes('סכום') || h5 === 'ענף' || h5.includes('ענף')) {
+            return 'cal';
+        }
+    }
+
+    // Legacy format (original): תאריך עסקה | בית עסק | קטגוריה | כרטיס | סוג | סכום | ...
+    if (h0.includes('תאריך') && (h0.includes('עסקה') || h0 === 'תאריך עסקה')) {
+        return 'legacy';
+    }
+    return null;
+}
+
+/** Parse various date representations into DD-MM-YYYY string + YYYY-MM month */
+function parseDateValue(val) {
+    let dateStr = '';
+    let month = '';
+    if (val == null || val === '') return { dateStr, month };
+
+    // Excel serial number (when cellDates:false and raw)
+    if (typeof val === 'number' && val > 20000 && val < 60000) {
+        // Excel epoch: days since 1899-12-30
+        const utc = new Date(Date.UTC(1899, 11, 30) + val * 86400000);
+        const d = utc.getUTCDate();
+        const m = utc.getUTCMonth() + 1;
+        const y = utc.getUTCFullYear();
+        dateStr = String(d).padStart(2, '0') + '-' + String(m).padStart(2, '0') + '-' + y;
+        month = y + '-' + String(m).padStart(2, '0');
+        return { dateStr, month };
+    }
+
+    // Already a Date object (if cellDates:true)
+    if (val instanceof Date && !isNaN(val.getTime())) {
+        const d = val.getDate();
+        const m = val.getMonth() + 1;
+        const y = val.getFullYear();
+        dateStr = String(d).padStart(2, '0') + '-' + String(m).padStart(2, '0') + '-' + y;
+        month = y + '-' + String(m).padStart(2, '0');
+        return { dateStr, month };
+    }
+
+    const s = String(val).trim();
+    // ISO-like: 2026-08-07 or 2026-08-07T00:00:00
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) {
+        dateStr = m[3].padStart(2, '0') + '-' + m[2].padStart(2, '0') + '-' + m[1];
+        month = m[1] + '-' + m[2].padStart(2, '0');
+        return { dateStr, month };
+    }
+    // DD/MM/YYYY or DD-MM-YYYY
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);
+    if (m) {
+        let y = m[3];
+        if (y.length === 2) y = '20' + y;
+        dateStr = m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') + '-' + y;
+        month = y + '-' + m[2].padStart(2, '0');
+        return { dateStr, month };
+    }
+    // Fallback: keep as-is
+    dateStr = s;
+    return { dateStr, month };
+}
+
+function parseAmount(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const n = parseFloat(String(val).replace(/,/g, '').replace(/[^\d.\-]/g, ''));
+    return isNaN(n) ? 0 : n;
+}
+
+function parseExcel(arrayBuffer) {
+    // Try with cellDates first for better date handling; fallback still works with serials
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellNF: false, cellText: false });
+    const allData = [];
+
+    workbook.SheetNames.forEach(sheetName => {
+        const sheet = workbook.Sheets[sheetName];
+        // raw:true keeps numbers/Dates; we handle both
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+
+        let headerRowIdx = -1;
+        let format = null;
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+            const cell0 = normalizeHeader(rows[i] && rows[i][0]);
+            if (cell0.includes('תאריך') && (cell0.includes('עסקה') || cell0 === 'תאריך עסקה')) {
+                headerRowIdx = i;
+                format = detectFormat(rows[i]);
+                break;
+            }
+        }
+        if (headerRowIdx < 0 || !format) return;
+
+        for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row[0] == null || row[0] === '') continue;
+
+            const rawDate = row[0];
+            const dateCheck = String(rawDate).trim();
+            // Skip summary / footer rows
+            if (
+                dateCheck === 'סך הכל' ||
+                dateCheck.includes('₪') ||
+                dateCheck.includes('את המידע המלא') ||
+                dateCheck.includes('מידע על חיובים')
+            ) {
+                continue;
+            }
+
+            const { dateStr, month } = parseDateValue(rawDate);
+            // Require a plausible date
+            if (!dateStr || (!month && !dateStr.match(/\d/))) continue;
+
+            let business, category, card, txType, amount, currency, chargeDate, notes, method;
+
+            if (format === 'cal') {
+                // CAL / Max: 0=date, 1=business, 2=amount, 3=chargeAmt, 4=type, 5=category(ענף), 6=notes
+                business = String(row[1] || '').trim();
+                amount = parseAmount(row[3] != null && row[3] !== '' ? row[3] : row[2]); // prefer סכום חיוב
+                txType = String(row[4] || '').trim();
+                category = String(row[5] || '').trim();
+                notes = String(row[6] || '').trim();
+                card = '';
+                currency = '₪';
+                chargeDate = '';
+                method = '';
+            } else {
+                // Legacy original format
+                business = String(row[1] || '').trim();
+                category = String(row[2] || '').trim();
+                card = String(row[3] || '').trim();
+                txType = String(row[4] || '').trim();
+                amount = parseAmount(row[5]);
+                currency = String(row[6] || '₪').trim();
+                chargeDate = String(row[9] || '').trim();
+                notes = String(row[10] || '').trim();
+                method = String(row[14] || '').trim();
+            }
+
+            const isRecurring =
+                (notes && notes.includes('הוראת קבע')) ||
+                (txType && (txType.includes('הוראת קבע') || txType === 'הוראת קבע'));
+
+            if (!business && amount === 0) continue;
+
+            allData.push({
+                date: dateStr,
+                business,
+                category,
+                card,
+                type: txType,
+                amount,
+                currency,
+                charge_date: chargeDate,
+                notes,
+                method,
+                sheet: sheetName,
+                month,
+                is_recurring: isRecurring
+            });
+        }
+    });
+
+    return allData;
+}
+
+function handleFile(file) {
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+        alert('יש לבחור קובץ Excel (.xlsx או .xls)');
+        return;
+    }
+
+    document.getElementById('loadingOverlay').classList.add('show');
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = parseExcel(e.target.result);
+            if (!data.length) {
+                alert('לא נמצאו עסקאות בקובץ.\nוודא שזה ייצוא בפורמט נתמך (עם עמודת "תאריך עסקה" – כאל/Max או פורמט ישן).');
+                document.getElementById('loadingOverlay').classList.remove('show');
+                return;
+            }
+            rawData = data;
+            currentData = [...data];
+
+            // Show dashboard
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+
+            document.getElementById('loadedFileName').querySelector('span').textContent = file.name;
+
+            // Date range
+            const months = [...new Set(data.map(d => d.month).filter(Boolean))].sort();
+            if (months.length) {
+                const first = months[0].split('-');
+                const last = months[months.length - 1].split('-');
+                document.getElementById('dataRange').textContent =
+                    (MONTH_NAMES[first[1]] || first[1]) + ' – ' + (MONTH_NAMES[last[1]] || last[1]) + ' ' + last[0];
+            }
+
+            populateFilters();
+            applyFilters();
+        } catch (err) {
+            console.error(err);
+            alert('שגיאה בקריאת הקובץ: ' + err.message);
+        }
+        document.getElementById('loadingOverlay').classList.remove('show');
+    };
+    reader.onerror = function() {
+        alert('שגיאה בקריאת הקובץ');
+        document.getElementById('loadingOverlay').classList.remove('show');
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+/* ========== Filters ========== */
+function populateFilters() {
+    const cats = [...new Set(rawData.map(d => d.category).filter(Boolean))].sort();
+    const months = [...new Set(rawData.map(d => d.month).filter(Boolean))].sort();
+    const cards = [...new Set(rawData.map(d => d.card).filter(Boolean))];
+
+    const catSel = document.getElementById('categoryFilter');
+    catSel.innerHTML = '<option value="">הכל</option>';
+    cats.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        catSel.appendChild(o);
+    });
+
+    const monSel = document.getElementById('monthFilter');
+    monSel.innerHTML = '<option value="">כל החודשים</option>';
+    months.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m;
+        const parts = m.split('-');
+        o.textContent = (MONTH_NAMES[parts[1]] || parts[1]) + ' ' + parts[0];
+        monSel.appendChild(o);
+    });
+
+    const cardSel = document.getElementById('cardFilter');
+    cardSel.innerHTML = '<option value="">הכל</option>';
+    cards.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = '**** ' + c;
+        cardSel.appendChild(o);
+    });
+}
+
+function applyFilters() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    const cat = document.getElementById('categoryFilter').value;
+    const mon = document.getElementById('monthFilter').value;
+    const typ = document.getElementById('typeFilter').value;
+    const card = document.getElementById('cardFilter').value;
+
+    currentData = rawData.filter(d => {
+        if (q && !(d.business.toLowerCase().includes(q) || d.notes.toLowerCase().includes(q) || d.category.toLowerCase().includes(q))) return false;
+        if (cat && d.category !== cat) return false;
+        if (mon && d.month !== mon) return false;
+        if (card && d.card !== card) return false;
+        if (typ === 'recurring' && !d.is_recurring) return false;
+        if (typ === 'regular' && d.is_recurring) return false;
+        if (typ === 'transfers' && d.category !== 'העברת כספים') return false;
+        return true;
+    });
+
+    renderAll(currentData);
+}
+
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('monthFilter').value = '';
+    document.getElementById('typeFilter').value = '';
+    document.getElementById('cardFilter').value = '';
+    applyFilters();
+}
+
+/* ========== Render ========== */
+function renderAll(data) {
+    renderKPIs(data);
+    renderCategoryChart(data);
+    renderMonthlyChart(data);
+    renderTopMerchants(data);
+    renderFixedVariable(data);
+    renderInsights(data);
+    renderBitSummary(data);
+    renderTable(data);
+}
+
+function renderKPIs(data) {
+    const total = data.reduce((s, d) => s + d.amount, 0);
+    const count = data.length;
+    const avg = count ? total / count : 0;
+    const months = [...new Set(data.map(d => d.month).filter(Boolean))];
+    const monthlyAvg = months.length ? total / months.length : 0;
+    const recurring = data.filter(d => d.is_recurring).reduce((s, d) => s + d.amount, 0);
+
+    const catTotals = {};
+    data.forEach(d => { if (d.category) catTotals[d.category] = (catTotals[d.category] || 0) + d.amount; });
+    let topCat = '-';
+    let maxV = -Infinity;
+    for (const [c, v] of Object.entries(catTotals)) {
+        if (v > maxV) { maxV = v; topCat = c; }
+    }
+
+    document.getElementById('kpi-total').textContent = fmtSigned(total);
+    document.getElementById('kpi-count').textContent = count.toLocaleString('he-IL');
+    document.getElementById('kpi-avg').textContent = fmt(avg);
+    document.getElementById('kpi-monthly').textContent = fmt(monthlyAvg);
+    document.getElementById('kpi-recurring').textContent = fmt(recurring);
+    document.getElementById('kpi-topcat').textContent = topCat.length > 12 ? topCat.slice(0, 11) + '…' : topCat;
+}
+
+function renderCategoryChart(data) {
+    const catFilter = document.getElementById('categoryFilter').value;
+    const totals = {};
+    let chartTitleMode = 'category';
+
+    if (catFilter) {
+        chartTitleMode = 'merchant';
+        data.forEach(d => {
+            if (d.business) {
+                const name = d.business.length > 22 ? d.business.slice(0, 20) + '…' : d.business;
+                totals[name] = (totals[name] || 0) + d.amount;
+            }
+        });
+    } else {
+        data.forEach(d => {
+            if (d.category) totals[d.category] = (totals[d.category] || 0) + d.amount;
+        });
+    }
+
+    document.getElementById('catChartTitle').textContent =
+        chartTitleMode === 'merchant'
+            ? 'התפלגות לפי בית עסק (בתוך הקטגוריה)'
+            : 'התפלגות לפי קטגוריה';
+
+    const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    const limited = sorted.slice(0, 10);
+    if (sorted.length > 10) {
+        const otherSum = sorted.slice(10).reduce((s, x) => s + x[1], 0);
+        if (otherSum !== 0) limited.push(['אחר', otherSum]);
+    }
+    const labels = limited.map(x => x[0]);
+    const values = limited.map(x => x[1]);
+
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    if (catChart) catChart.destroy();
+
+    catChart = new Chart(ctx, {
+        type: catChartType,
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: COLORS.slice(0, labels.length),
+                borderWidth: catChartType === 'doughnut' ? 2 : 1,
+                borderColor: catChartType === 'doughnut'
+                    ? (document.documentElement.getAttribute('data-theme') === 'dark' ? '#1a1d27' : '#fff')
+                    : COLORS.slice(0, labels.length),
+                borderRadius: catChartType === 'bar' ? 6 : 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: catChartType === 'doughnut',
+                    position: 'left',
+                    labels: {
+                        boxWidth: 12,
+                        font: { size: 11, family: 'Rubik' },
+                        color: getComputedStyle(document.body).getPropertyValue('--text').trim()
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                            return ' ' + fmt(ctx.raw) + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            },
+            scales: catChartType === 'bar' ? {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: v => '₪' + v.toLocaleString('he-IL'),
+                        color: getComputedStyle(document.body).getPropertyValue('--text-muted').trim()
+                    },
+                    grid: { color: getComputedStyle(document.body).getPropertyValue('--border').trim() }
+                },
+                x: {
+                    ticks: {
+                        color: getComputedStyle(document.body).getPropertyValue('--text-muted').trim(),
+                        maxRotation: 45
+                    },
+                    grid: { display: false }
+                }
+            } : {}
+        }
+    });
+}
+
+function switchCatChart(btn, type) {
+    document.querySelectorAll('#catChartTabs .nav-link').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    catChartType = type;
+    renderCategoryChart(currentData);
+}
+
+function renderMonthlyChart(data) {
+    const totals = {};
+    data.forEach(d => {
+        if (d.month) totals[d.month] = (totals[d.month] || 0) + d.amount;
+    });
+    const months = Object.keys(totals).sort();
+    const labels = months.map(m => {
+        const p = m.split('-');
+        return (MONTH_SHORT[p[1]] || p[1]) + ' ' + p[0].slice(2);
+    });
+    const values = months.map(m => totals[m]);
+
+    const ctx = document.getElementById('monthlyChart').getContext('2d');
+    if (monthlyChart) monthlyChart.destroy();
+
+    monthlyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'הוצאות',
+                data: values,
+                borderColor: '#1e3c72',
+                backgroundColor: 'rgba(30,60,114,0.12)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 5,
+                pointBackgroundColor: '#1e3c72'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: v => '₪' + (v / 1000).toFixed(0) + 'K',
+                        color: getComputedStyle(document.body).getPropertyValue('--text-muted').trim()
+                    },
+                    grid: { color: getComputedStyle(document.body).getPropertyValue('--border').trim() }
+                },
+                x: {
+                    ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted').trim() },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function renderTopMerchants(data) {
+    const totals = {};
+    data.forEach(d => {
+        if (d.business) totals[d.business] = (totals[d.business] || 0) + d.amount;
+    });
+    const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const max = sorted.length ? sorted[0][1] : 1;
+
+    const el = document.getElementById('topMerchants');
+    if (!sorted.length) {
+        el.innerHTML = '<div class="text-muted">אין נתונים</div>';
+        return;
+    }
+
+    el.innerHTML = sorted.map(([name, sum], i) => `
+        <div class="top-list-item">
+            <div style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">
+                <span class="text-muted me-1">${i + 1}.</span>${name}
+            </div>
+            <div class="fw-semibold">${fmt(sum)}</div>
+        </div>
+        <div class="progress mb-1" style="height:4px;">
+            <div class="progress-bar" style="width:${(sum / max) * 100}%;background:${COLORS[i % COLORS.length]}!important;"></div>
+        </div>
+    `).join('');
+}
+
+function renderFixedVariable(data) {
+    const fixed = data.filter(d => d.is_recurring).reduce((s, d) => s + d.amount, 0);
+    const total = data.reduce((s, d) => s + d.amount, 0);
+    const variable = total - fixed;
+    const absTotal = Math.abs(total) || 1;
+
+    document.getElementById('fixed-amount').textContent = fmt(fixed);
+    document.getElementById('variable-amount').textContent = fmt(variable);
+    document.getElementById('fixed-bar').style.width = Math.min(100, (Math.abs(fixed) / absTotal) * 100) + '%';
+    document.getElementById('variable-bar').style.width = Math.min(100, (Math.abs(variable) / absTotal) * 100) + '%';
+}
+
+function renderInsights(data) {
+    const total = data.reduce((s, d) => s + d.amount, 0);
+    const transfers = data.filter(d => d.category === 'העברת כספים').reduce((s, d) => s + d.amount, 0);
+    const food = data.filter(d => d.category === 'מזון וצריכה').reduce((s, d) => s + d.amount, 0);
+    const gov = data.filter(d => d.category === 'עירייה וממשלה').reduce((s, d) => s + d.amount, 0);
+    const car = data.filter(d => d.category === 'תחבורה ורכבים').reduce((s, d) => s + d.amount, 0);
+    const months = [...new Set(data.map(d => d.month).filter(Boolean))];
+    const refunds = data.filter(d => d.amount < 0);
+
+    let html = '';
+    if (total > 0) {
+        html += `<div class="mb-2"><i class="bi bi-arrow-left-right text-primary me-1"></i> <strong>${((transfers / total) * 100).toFixed(0)}%</strong> מההוצאות הן העברות כספים (${fmt(transfers)})</div>`;
+        html += `<div class="mb-2"><i class="bi bi-building text-warning me-1"></i> עירייה וממשלה: <strong>${fmt(gov)}</strong> (${((gov / total) * 100).toFixed(0)}%)</div>`;
+        html += `<div class="mb-2"><i class="bi bi-cart text-success me-1"></i> מזון וצריכה: <strong>${fmt(food)}</strong></div>`;
+        html += `<div class="mb-2"><i class="bi bi-car-front text-danger me-1"></i> תחבורה ורכבים: <strong>${fmt(car)}</strong></div>`;
+    }
+    if (refunds.length) {
+        html += `<div class="mb-2"><i class="bi bi-arrow-counterclockwise text-info me-1"></i> ${refunds.length} החזרים/ביטולים בסך ${fmtSigned(refunds.reduce((s, d) => s + d.amount, 0))}</div>`;
+    }
+    if (months.length) {
+        html += `<div><i class="bi bi-calendar-check text-muted me-1"></i> מכסה ${months.length} חודשים</div>`;
+    }
+    document.getElementById('insights').innerHTML = html || '<span class="text-muted">אין תובנות להצגה</span>';
+}
+
+function renderBitSummary(data) {
+    const bitSummary = document.getElementById('bitSummary');
+    const bitSummaryCard = bitSummary.closest('.col-12');
+
+    const bits = data.filter(d =>
+        (d.business && d.business.toUpperCase().includes('BIT')) || d.category === 'העברת כספים'
+    );
+    const byRecipient = {};
+    bits.forEach(d => {
+        let name = 'אחר';
+        const m = d.notes.match(/למי:\s*(.+)/);
+        if (m) name = m[1].trim();
+        else if (d.business && d.business.toUpperCase().includes('BIT')) name = d.business;
+        byRecipient[name] = (byRecipient[name] || 0) + d.amount;
+    });
+    const sorted = Object.entries(byRecipient).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const total = bits.reduce((s, d) => s + d.amount, 0);
+
+    // אם אין העברות – מסתירים את כל הכרטיס
+    if (total === 0) {
+        bitSummaryCard.style.display = 'none';
+        return;
+    }
+
+    // יש העברות – מציגים את הכרטיס
+    bitSummaryCard.style.display = '';
+
+    let html = `<div class="mb-2 fw-semibold">סה״כ העברות: ${fmt(total)}</div>`;
+    if (sorted.length) {
+        html += sorted.map(([name, sum]) =>
+            `<div class="d-flex justify-content-between py-1 border-bottom" style="border-color:var(--border)!important;">
+                <span style="max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span>
+                <span class="fw-semibold">${fmt(sum)}</span>
+            </div>`
+        ).join('');
+    } else {
+        html += '<span class="text-muted">אין העברות</span>';
+    }
+    document.getElementById('bitSummary').innerHTML = html;
+}
+
+function renderTable(data) {
+    const sorted = [...data].sort((a, b) => {
+        let va = a[sortCol], vb = b[sortCol];
+        if (sortCol === 'amount') { va = a.amount; vb = b.amount; }
+        else if (sortCol === 'date') {
+            const pa = a.date.replace(/\//g, '-').split('-').reverse().join('');
+            const pb = b.date.replace(/\//g, '-').split('-').reverse().join('');
+            va = pa; vb = pb;
+        } else {
+            va = (va || '').toString();
+            vb = (vb || '').toString();
+        }
+        if (va < vb) return sortAsc ? -1 : 1;
+        if (va > vb) return sortAsc ? 1 : -1;
+        return 0;
+    });
+
+    const tbody = document.getElementById('tableBody');
+    const empty = document.getElementById('emptyState');
+    document.getElementById('tableCount').textContent = '(' + sorted.length + ')';
+
+    if (!sorted.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('d-none');
+        return;
+    }
+    empty.classList.add('d-none');
+
+    tbody.innerHTML = sorted.map(d => `
+        <tr>
+            <td style="white-space:nowrap;">${d.date}</td>
+            <td class="fw-medium">${d.business || '-'}</td>
+            <td><span class="badge-cat">${d.category || 'ללא'}</span></td>
+            <td class="${d.amount < 0 ? 'amount-neg' : 'amount-pos'}" style="white-space:nowrap;">${fmtSigned(d.amount)}</td>
+            <td>
+                <small>${d.type || ''}</small>
+                ${d.is_recurring ? '<span class="badge badge-recurring ms-1">קבע</span>' : ''}
+            </td>
+            <td><small class="text-muted">${d.notes || ''}</small></td>
+            <td><small>${d.charge_date || ''}</small></td>
+        </tr>
+    `).join('');
+}
+
+function exportCSV() {
+    if (!currentData.length) { alert('אין נתונים לייצוא'); return; }
+    const headers = ['תאריך', 'בית עסק', 'קטגוריה', 'סכום', 'סוג עסקה', 'כרטיס', 'תאריך חיוב', 'הערות', 'הוראת קבע'];
+    const rows = currentData.map(d => [
+        d.date, d.business, d.category, d.amount, d.type, d.card, d.charge_date, d.notes, d.is_recurring ? 'כן' : 'לא'
+    ]);
+    let csv = headers.join(',') + '\n';
+    rows.forEach(r => {
+        csv += r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',') + '\n';
+    });
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transactions_export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'light');
+        document.querySelectorAll('#themeToggle, #themeToggleTop').forEach(el => {
+            el.innerHTML = '<i class="bi bi-moon-stars"></i>';
+        });
+    } else {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+        document.querySelectorAll('#themeToggle, #themeToggleTop').forEach(el => {
+            el.innerHTML = '<i class="bi bi-sun"></i>';
+        });
+    }
+    if (currentData.length) {
+        renderCategoryChart(currentData);
+        renderMonthlyChart(currentData);
+    }
+}
+
+/* ========== Init ========== */
+function init() {
+    // Theme
+    if (localStorage.getItem('theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.querySelectorAll('#themeToggle, #themeToggleTop').forEach(el => {
+            el.innerHTML = '<i class="bi bi-sun"></i>';
+        });
+    }
+
+    // File input
+    const fileInput = document.getElementById('fileInput');
+    fileInput.addEventListener('change', e => {
+        if (e.target.files[0]) handleFile(e.target.files[0]);
+        e.target.value = ''; // allow re-selecting same file
+    });
+
+    // Drag & drop
+    const zone = document.getElementById('uploadZone');
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+
+    // Filter events (delegated after load)
+    ['searchInput', 'categoryFilter', 'monthFilter', 'typeFilter', 'cardFilter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener(id === 'searchInput' ? 'input' : 'change', applyFilters);
+    });
+
+    // Sort headers
+    document.querySelectorAll('#txTable th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if (sortCol === col) sortAsc = !sortAsc;
+            else { sortCol = col; sortAsc = true; }
+            renderTable(currentData);
+        });
+    });
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
